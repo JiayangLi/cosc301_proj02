@@ -147,6 +147,7 @@ int main(int argc, char **argv) {
 
     int done = 0;
     int mode = 1; //1-sequential, 0-parallel
+    int new_mode = 1; //keep track of changes in mode
 
     while (!done){
     	printf("%s", prompt);
@@ -172,7 +173,7 @@ int main(int argc, char **argv) {
                 continue;
             }
 
-            if (check_mode(cmd[cmd_n], &mode) == 0){ //mode found
+            if (check_mode(cmd[cmd_n], &new_mode) == 0){ //mode found
                 cmd_n++;
                 continue;
             }
@@ -189,8 +190,11 @@ int main(int argc, char **argv) {
             }
             else if (pid > 0){ //parent process, wait in sequential mode
                 // add if..else here for different modes
-                waitpid(pid, &status, 0);
-                cmd_n++;
+                if (mode == 1){
+                    waitpid(pid, &status, 0);
+                    cmd_n++;
+                }
+                
             }
             else{   //fork failed, quit
                 fprintf(stderr, "fork failed: %s\n", strerror(errno));
