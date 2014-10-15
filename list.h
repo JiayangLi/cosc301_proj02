@@ -11,8 +11,9 @@ struct node {
 
 /* your function declarations associated with the list */
 void list_insert(pid_t, char *, struct node **);
+void list_delete(pid_t, struct node **);
 void list_clear(struct node *);
 void list_print(const struct node *);
-void change_state(pid_t, char *, struct node *);
+int change_state(pid_t, char *, struct node *);
 
 #endif // __LIST_H__
