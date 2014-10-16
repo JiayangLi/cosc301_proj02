@@ -3,14 +3,6 @@
 #include <string.h>
 #include "list.h"
 
-void list_clear(struct node *list){
-	while (list != NULL){
-		struct node *temp = list;
-		list = list->next;
-		free(temp);
-	}
-}
-
 void list_insert(pid_t pid, char *cmd, struct node **head){
 	struct node *addition = malloc(sizeof(struct node));
 	addition->pid = pid;
