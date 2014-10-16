@@ -1,3 +1,15 @@
+/*
+cosc 301 project 2
+
+Shouheng Wu
+-Path capability in stage 2
+
+Jiayang Li
+-Sequential mode and command parsing
+
+Two of us worked together on parallel mode.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -11,6 +23,7 @@
 #include <poll.h>
 #include <signal.h>
 #include <errno.h>
+#include <stdbool.h>
 #include "list.h"
 
 /*Adapted from previous lab*/
@@ -55,6 +68,75 @@ void free_tokens(char **tokens) {
     free(tokens); // then free the array
 }
 
+bool valid_command(char **curr){
+
+    struct stat statresult;
+    int rv = stat(curr[0], &statresult);
+    if (rv < 0){
+
+        return false;
+    }
+
+    return true;
+
+}//end valid_command
+
+void update_path(char **curr){
+    
+    FILE *fp = fopen("shell-config", "r");
+    if(NULL == fp){
+        fprintf(stderr, "Failed to open shell-config.\n");
+        return;
+    }//end if
+    
+    char buffer[1024];
+    while(NULL != fgets(buffer, sizeof(buffer), fp)){
+
+        for(int i = 0; i < strlen(buffer); i++){//eliminate the trailing new line character
+            if(buffer[i] == '\n'){
+                buffer[i] = '\0';
+            }//end if
+        }//end for
+
+        int pos = strlen(buffer);//find the end of the string
+
+        if(buffer[pos - 1] != '/'){
+            buffer[pos++] = '/';
+            buffer[pos] = '\0';
+        }//end if
+        
+        for(int i = 0; i < strlen(curr[0]); i++){
+            buffer[pos] = curr[0][i];
+            pos++;
+        }//end for
+
+        buffer[pos] = '\0';
+
+        struct stat statresult;
+        int rv = stat(buffer, &statresult);
+        if(rv >= 0){//if the path is valid
+            free(curr[0]);
+            curr[0] = strdup(buffer);
+        }//end if
+
+    }//end while
+
+    fclose(fp);
+
+}//end update_path
+
+void add_path(char ***cmd){
+
+    for(int i = 0; cmd[i] != NULL; i++){
+
+        if(!valid_command(cmd[i])){
+            update_path(cmd[i]);
+        
+        }//end if
+    }//end for
+
+}//end add_path
+
 /*Remove comment from tokens by replacing the first
 comment token by NULL*/
 void remove_comment(char **tokens){
@@ -66,6 +148,8 @@ void remove_comment(char **tokens){
 	}
 }
 
+/*Return a list of commands, represented as an array
+of an array of strings*/
 char ***get_commands(char **tokens){
     int count = 1;
     for (int i = 0; tokens[i] != NULL; i++){
@@ -90,6 +174,7 @@ char ***get_commands(char **tokens){
     return rv;
 }
 
+/*free memory allocated for the cmd list*/
 void free_commands(char ***cmd){
     for (int i = 0; cmd[i] != NULL; i++){
         free_tokens(cmd[i]);
@@ -97,6 +182,9 @@ void free_commands(char ***cmd){
     free(cmd);
 }
 
+/*fill a given buffer with user input
+return 0 in the case of normal input
+return 1 in the case of eof and error*/
 int get_input(char *buffer){
     while (fgets(buffer, 1024, stdin) != NULL){
         return 0; //0-normal input
@@ -104,6 +192,10 @@ int get_input(char *buffer){
     return 1; //1-eof or error
 }
 
+/*check if a given command is exit
+update done variable as necessary
+return 1 if the command is exit
+return 0 otherwise*/
 int check_exit(char **cmd, int *p_done, struct node *head){
     if (strcasecmp(cmd[0], "exit") == 0){
         if (head != NULL){
@@ -117,6 +209,10 @@ int check_exit(char **cmd, int *p_done, struct node *head){
     return 0; //1-exit command not found
 }
 
+/*check if a given command is mode
+update mode variable as necessary
+return 1 if the command is mode
+return 0 otherwise*/
 int check_mode(char **cmd, int *p_mode){
     if (strcasecmp(cmd[0], "mode") == 0){
         if (cmd[1] == NULL){
@@ -146,6 +242,10 @@ int check_mode(char **cmd, int *p_mode){
     return 0; //1-mode command not found
 }
 
+/*check if a given command is jobs
+print the job list as needed
+return 1 if the command is jobs
+return 0 otherwise*/
 int check_jobs(char **cmd, struct node *head){
     if (strcasecmp(cmd[0], "jobs") == 0){
         if (cmd[1] == NULL){
@@ -159,6 +259,10 @@ int check_jobs(char **cmd, struct node *head){
     return 0; //jobs command not found
 }
 
+/*check if a given command is resume or pause
+pause or resume a specified process as needed
+return 1 if the command is resume or pause
+return 0 otherwise*/
 int check_pause_resume(char **cmd, struct node *head, char *to_do){
     if (strcasecmp(cmd[0], to_do) == 0){
         if (cmd[2] != NULL){
@@ -166,16 +270,19 @@ int check_pause_resume(char **cmd, struct node *head, char *to_do){
             return 1;
         }
 
-        char
+        char op[8];
 
         if (strcasecmp(to_do, "resume") == 0){
-            to_do = "run";
+            strcpy(op, "running");
+        }
+        else{
+            strcpy(op, "paused");
         }
 
-        int update = change_state(atoi(cmd[1]), to_do, head);
+        int update = change_state(atoi(cmd[1]), op, head);
 
         if (update == 1){
-            if (strcasecmp(to_do, "pause") == 0){
+            if (strcasecmp(op, "pause") == 0){
                 kill(atoi(cmd[1]), SIGSTOP);
             }
             else{
@@ -193,6 +300,8 @@ int check_pause_resume(char **cmd, struct node *head, char *to_do){
     return 0; //pause/resume command not found
 }
 
+/*remove any comments and whitespaces from a user input
+return a list of commands based on the user input*/
 char ***create_cmd_list(){
     char buffer[1024];
     if (get_input(buffer) == 1){ //eof encountered
@@ -206,9 +315,13 @@ char ***create_cmd_list(){
 
     free_tokens(tokens);
 
+    add_path(cmd);
+
     return cmd;
 }
 
+/*execute one line of user input according to a specified mode
+update done, mode and job_list variables as needed*/
 void execute_jobs(int *p_done, int *p_mode, struct node **list, int mode){
 
     char ***cmd = create_cmd_list();
@@ -251,15 +364,13 @@ void execute_jobs(int *p_done, int *p_mode, struct node **list, int mode){
         }
     } //end of cmd while 
 
-    //printf("after execute_jobs: \n");
-    //list_print(list);
-
     free_commands(cmd);
 }
 
-
-
-
+/*check for any finished jobs in the job_list
+return 1 if at least 1 job is done
+return 0 otherwise
+the return value is used to determine the need to print prompt*/
 int check_finished_jobs(struct node **list){
     //printf("before check: \n");
     //list_print(*list);
@@ -289,7 +400,6 @@ int check_finished_jobs(struct node **list){
 
     return rv; 
 }
-
 
 int main(int argc, char **argv) {
 
