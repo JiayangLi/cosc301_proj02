@@ -135,15 +135,16 @@ void add_path(char ***cmd){
 
 }//end add_path
 
-/*Remove comment from tokens by replacing the first
-comment token by NULL*/
-void remove_comment(char **tokens){
-	for (int i = 0; tokens[i] != NULL; i++){
-		if (tokens[i][0] == '#'){
-			tokens[i] = NULL;
-			return;
-		}
-	}
+/*Remove comment from a given string by replacing the first
+'#'' with '\0' 
+E.g. ls#abc is a valid command*/
+void remove_comment(char *s){
+	for (int i = 0; i < strlen(s); i++){
+        if (s[i] == '#'){
+            s[i] = '\0';
+            return;
+        }
+    }
 }
 
 /*Return a list of commands, represented as an array
@@ -159,8 +160,6 @@ char ***get_commands(char **tokens){
     int j = 0;
     for (int i = 0; tokens[i] != NULL; i++){
         char **temp = tokenify(tokens[i], " \t\n");
-
-        remove_comment(temp);
 
         if (temp[0] != NULL){ //add non-empty input
             rv[j] = temp;
@@ -205,9 +204,9 @@ int check_exit(char **cmd, int *p_done, struct node *head){
         else{
             *p_done = 1; //no background jobs, exit allowed
         }
-        return 1; //0-exit command found
+        return 1; //exit command found
     }
-    return 0; //1-exit command not found
+    return 0; //exit command not found
 }
 
 /*check if a given command is mode
@@ -309,6 +308,8 @@ char ***create_cmd_list(){
         printf("\n");
         exit(EXIT_SUCCESS);
     }
+
+    remove_comment(buffer);
 
     char **tokens = tokenify(buffer, ";");
     
