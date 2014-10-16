@@ -76,10 +76,8 @@ bool valid_command(char **curr){
 
         return false;
     }
-
     return true;
-
-}//end valid_command
+}
 
 void update_path(char **curr){
     
@@ -161,6 +159,9 @@ char ***get_commands(char **tokens){
     int j = 0;
     for (int i = 0; tokens[i] != NULL; i++){
         char **temp = tokenify(tokens[i], " \t\n");
+
+        remove_comment(temp);
+
         if (temp[0] != NULL){ //add non-empty input
             rv[j] = temp;
             j++;
@@ -222,7 +223,7 @@ int check_mode(char **cmd, int *p_mode){
             else{
                 printf("The current mode is parallel.\n");
             }
-        } //end of cmd[1]==NULL if
+        } //end of (cmd[1]==NULL) if
 
         else if (strcasecmp(cmd[1], "sequential") == 0 || strcasecmp(cmd[1], "s") == 0){
             *p_mode = 1;
@@ -310,7 +311,7 @@ char ***create_cmd_list(){
     }
 
     char **tokens = tokenify(buffer, ";");
-    remove_comment(tokens);
+    
     char ***cmd = get_commands(tokens);
 
     free_tokens(tokens);
@@ -337,13 +338,13 @@ void execute_jobs(int *p_done, int *p_mode, struct node **list, int mode){
             continue;
         }
 
-
         int status;
         pid_t pid = fork();
         
         if (pid == 0){ //child process, executes a command
             if (execv(cmd[cmd_n][0], cmd[cmd_n]) < 0){
                 fprintf(stderr, "execv failed: %s\n", strerror(errno));
+                free_commands(cmd);
                 exit(EXIT_FAILURE);
             }
         }
